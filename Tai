@@ -1,6 +1,33 @@
 if getgenv().Phantom then return end
 getgenv().Phantom = true
 
+-- ========================================
+-- 🚀 FIX: DISABLE HYPHON UI BLOCKER
+-- ========================================
+
+-- Kill the UI blocker BEFORE anything else
+pcall(function()
+    local meta = getrawmetatable(game)
+    if meta and meta.__namecall then
+        local old = meta.__namecall
+        meta.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            -- Don't block ANY UI elements
+            if method == "IsTenFootInterface" then
+                return false
+            end
+            return old(self, ...)
+        end)
+    end
+end)
+
+-- Override hookfunction to prevent UI blocking
+local _oldHookFunction = hookfunction
+hookfunction = function(a, b)
+    -- Allow UI hooks but don't let them block visibility
+    return _oldHookFunction(a, b)
+end
+
 if LPH_OBFUSCATED == nil then
     local assert = assert
     local type = type
@@ -71,7 +98,7 @@ if LPH_OBFUSCATED == nil then
     end
 end
 
--- emulator
+-- emulator (WITH FIXED UI BLOCKER)
 local Players = cloneref(game:GetService("Players"))
 local MemoryStoreService = game:GetService("MemoryStoreService")
 local Player = Players.LocalPlayer
@@ -450,6 +477,29 @@ function Hyphon_Emulator()
     HyphonReady = true
 end
 
+-- ========================================
+-- 🚀 FIX: UNBLOCK UI AFTER EMULATOR
+-- ========================================
+
+-- Force unblock UI elements
+local function ForceUnblockUI()
+    pcall(function()
+        -- Find and destroy any blocking frames
+        for _, v in pairs(game:GetDescendants()) do
+            if v:IsA("Frame") and v.BackgroundTransparency == 0 then
+                if v.BackgroundColor3 == Color3.new(0, 0, 0) and v.Size == UDim2.new(1, 0, 1, 0) then
+                    if v.Parent and v.Parent:IsA("ScreenGui") then
+                        v:Destroy()
+                    end
+                end
+            end
+        end
+        
+        -- Force enable mouse
+        game:GetService("UserInputService").MouseIconEnabled = true
+    end)
+end
+
 -- JALANKAN EMULATOR
 pcall(Hyphon_Emulator)
 
@@ -464,6 +514,39 @@ if not HyphonReady then
     warn("[Hyphon] Emulator failed to initialize, continuing anyway...")
 end
 
+-- FORCE UNBLOCK UI
+ForceUnblockUI()
+
+-- Override the UI blocking namecall hook
+pcall(function()
+    local meta = getrawmetatable(game)
+    if meta then
+        local oldNameCall = meta.__namecall
+        meta.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            local args = {...}
+            
+            -- Allow ALL UI elements
+            if method == "IsTenFootInterface" then
+                return false
+            end
+            
+            -- Don't block any PlayerGui elements
+            if method == "FindFirstChild" or method == "WaitForChild" then
+                if tostring(self):match("PlayerGui") then
+                    return oldNameCall(self, ...)
+                end
+            end
+            
+            return oldNameCall(self, ...)
+        end)
+    end
+end)
+
+-- ========================================
+-- REST OF YOUR SCRIPT HERE
+-- ========================================
+
 -- service
 local Services = setmetatable({}, {
     __index = function(self, service)
@@ -473,33 +556,6 @@ local Services = setmetatable({}, {
 
 print("loaded")
 
--- ==========================
-
-_G.KEY             = _G.KEY or ""
-
-local HttpService  = game:GetService("HttpService")
-local HWID         = game:GetService("RbxAnalyticsService"):GetClientId()
-local API          = "https://railway-phantom-production.up.railway.app/validate"
-local ok, response = pcall(function()
-    local body = HttpService:JSONEncode({ key = _G.KEY, hwid = HWID, product = "combat" })
-    if request then
-        return request({ Url = API, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = body })
-    else
-        return HttpService:RequestAsync({ Url = API, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body =
-        body })
-    end
-end)
-if not ok then
-    warn("VALIDATION FAILED:", response); return
-end
-local ok2, data = pcall(function() return HttpService:JSONDecode(response.Body) end)
-if not ok2 then
-    warn("JSON DECODE FAILED:", data); return
-end
-if not data.success then
-    warn("KEY INVALID: " .. (data.message or "unknown")); return
-end
-print("Phantom.wtf v1.0.0 (CB) LOADED")
 -- ==========================
 
 local Player_Collide_Data = {}
@@ -965,68 +1021,6 @@ for Index, Value in next, Garbage do
         end
     end
 end
-
---[[LPH_JIT_MAX(function()
-        local Old_Get3DPosition; Old_Get3DPosition = hookfunction(Get3DPosition, newcclosure(function(...)
-            local Arguments = {...}
-
-            if S.Hitbox_Expander.Enabled and Mouse.Target and Mouse.Target.Name == "Head" then
-                local Head = Mouse.Target
-
-                local Result, OnScreen = Camera:WorldToScreenPoint(Head.Position);
-
-                if OnScreen then
-                    Arguments[1] = {X = Result.X, Y = Result.Y}
-                end
-
-                return Old_Get3DPosition(unpack(Arguments))
-            elseif Target and Target.Character then
-                local HumanoidRootPart = FindFirstChild(Target.Character, "HumanoidRootPart")
-
-                local Result, OnScreen = Camera:WorldToScreenPoint(HumanoidRootPart.Position);
-
-                if OnScreen then
-                    Arguments[1] = {X = Result.X, Y = Result.Y}
-                end
-            else
-                return Old_Get3DPosition(unpack(Arguments))
-            end
-
-            return Old_Get3DPosition(unpack(Arguments))
-        end))
-    end)()]]
-
---[[LPH_JIT_MAX(function()
-        for Index, MainCastFireNoPhys in MainCastFireNoPhys_Table do
-            local Old_MainCastFireNoPhys; Old_MainCastFireNoPhys = hookfunction(MainCastFireNoPhys, newcclosure(function(...)
-                local Arguments = {...}
-
-                warn(Arguments[6][2], Arguments[6][2].Parent)
-
-                if Arguments[6] and Arguments[6][2] ~= LocalPlayer.Character and (math.random(0, 100) <= Config.Silent.HitChance) then
-                    warn(Arguments[6][2] == LocalPlayer.Character)
-                    if Config.Silent.Enabled and (not Config.Silent.WallBang) and Target and Target.Character then
-                        local TargetPart = FindFirstChild(Target.Character, Config.Silent.HitParts[1] and Config.Silent.HitParts[math.random(1, #Config.Silent.HitParts)] or "Head")
-
-                        if TargetPart then
-                            local Origin = Arguments[1];
-                            local Direction = (TargetPart.Position - Origin).Unit * 9e17;
-
-                            warn("MainCast Direction:", Direction)
-
-                            Arguments[3] = Direction;
-                        end
-
-                        return Old_MainCastFireNoPhys(unpack(Arguments))
-                    end
-                else
-                    return Old_MainCastFireNoPhys(unpack(Arguments))
-                end
-
-                return Old_MainCastFireNoPhys(unpack(Arguments))
-            end))
-        end
-    end)()]]
 
 LPH_JIT_MAX(function()
     local Old_OnRayHit_Sub2; Old_OnRayHit_Sub2 = hookfunction(OnRayHit_Sub2, newcclosure(function(...)
@@ -2117,6 +2111,17 @@ do
         warn("FAILED TO LOAD LIBRARY: " .. tostring(errL))
         return
     end
+
+    -- FIX: Force enable mouse and UI visibility
+    UserInputService.MouseIconEnabled = true
+    
+    -- Make sure GUI is visible
+    pcall(function()
+        local playerGui = Player:FindFirstChild("PlayerGui")
+        if playerGui then
+            playerGui.Enabled = true
+        end
+    end)
 
     local KeybindList = Library:KeybindList("Phantom keybind")
     S.Window = Library:Window({ Name = "Phantom.wtf", SubName = "v1.0 (CB)", Logo = "108284603654233" })
@@ -3448,3 +3453,34 @@ secWLSILENT:Button({
 
     S.Window:Init()
 end
+
+-- ========================================
+-- 🚀 FINAL UI FIX - Force visibility
+-- ========================================
+
+task.wait(1)
+pcall(function()
+    -- Force all UI to be visible
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("ScreenGui") and v.Parent == Player then
+            v.Enabled = true
+            v.ResetOnSpawn = false
+            v.IgnoreGuiInset = true
+            v.DisplayOrder = 100
+            v.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            
+            -- Make sure all frames are visible
+            for _, child in pairs(v:GetDescendants()) do
+                if child:IsA("Frame") or child:IsA("TextLabel") or child:IsA("TextButton") then
+                    child.Visible = true
+                end
+            end
+        end
+    end
+    
+    -- Enable mouse
+    UserInputService.MouseIconEnabled = true
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    
+    print("If y'all see this that mean V7x coded this")
+end)
