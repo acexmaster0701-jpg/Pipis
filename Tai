@@ -3482,5 +3482,5 @@ pcall(function()
     UserInputService.MouseIconEnabled = true
     UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     
-    print("If y'all see this that mean V7x coded this")
+    print("✅ UI Fix applied - All elements should be visible now!")
 end)
