@@ -8213,7 +8213,6 @@ end
 -- ========================================
 -- FINAL UI FIX - Force visibility
 -- ========================================
-
 task.wait(1)
 pcall(function()
     for _, v in pairs(game:GetDescendants()) do
@@ -8235,5 +8234,465 @@ pcall(function()
     UserInputService.MouseIconEnabled = true
     UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 
-    print("V7x UI Fix applied - All elements should be visible now!")
+    print("The best script in indonesia is ready to use!")
 end)
+
+if getgenv().KeybindListGUI then return end
+getgenv().KeybindListGUI = true
+
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+-- Keys display names
+local Keys = {
+    ["Unknown"] = "Unknown",
+    ["Backspace"] = "Backspace",
+    ["Tab"] = "Tab",
+    ["Clear"] = "Clear",
+    ["Return"] = "Enter",
+    ["Pause"] = "Pause",
+    ["Escape"] = "Esc",
+    ["Space"] = "Space",
+    ["Quote"] = "'",
+    ["Comma"] = ",",
+    ["Minus"] = "-",
+    ["Period"] = ".",
+    ["Slash"] = "/",
+    ["Zero"] = "0",
+    ["One"] = "1",
+    ["Two"] = "2",
+    ["Three"] = "3",
+    ["Four"] = "4",
+    ["Five"] = "5",
+    ["Six"] = "6",
+    ["Seven"] = "7",
+    ["Eight"] = "8",
+    ["Nine"] = "9",
+    ["Semicolon"] = ";",
+    ["Equals"] = "=",
+    ["LeftBracket"] = "[",
+    ["RightBracket"] = "]",
+    ["BackSlash"] = "\\",
+    ["Delete"] = "Delete",
+    ["Insert"] = "Insert",
+    ["Home"] = "Home",
+    ["End"] = "End",
+    ["PageUp"] = "PgUp",
+    ["PageDown"] = "PgDn",
+    ["RightShift"] = "RShift",
+    ["LeftShift"] = "LShift",
+    ["RightControl"] = "RCtrl",
+    ["LeftControl"] = "LCtrl",
+    ["LeftAlt"] = "LAlt",
+    ["RightAlt"] = "RAlt",
+}
+
+local keybindData = {}
+local guiFrame = nil
+local isVisible = false
+
+-- Collect all keybinds from Library flags
+local function CollectKeybinds()
+    keybindData = {}
+    if not getgenv().Library or not getgenv().Library.Flags then return end
+    
+    local Library = getgenv().Library
+    
+    for flag, value in pairs(Library.Flags) do
+        if type(value) == "table" and value.Key then
+            -- Clean up the flag name for display
+            local displayName = flag
+            displayName = displayName:gsub("Keybind", ""):gsub("Key", "")
+            displayName = displayName:gsub("([A-Z])", " %1"):gsub("^%s+", "")
+            if displayName == "" then displayName = flag end
+            
+            -- Get key display name
+            local keyDisplay = "None"
+            if value.Key then
+                local keyStr = tostring(value.Key)
+                keyStr = keyStr:gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
+                keyDisplay = Keys[keyStr] or keyStr
+            end
+            
+            table.insert(keybindData, {
+                name = displayName,
+                key = keyDisplay,
+                mode = value.Mode or "Toggle"
+            })
+        end
+    end
+    
+    -- Also check S table for keybinds
+    if getgenv().S then
+        local S = getgenv().S
+        for name, value in pairs(S) do
+            if type(value) == "table" and (value.Keybind or value.KeybindKey) then
+                local key = value.Keybind or value.KeybindKey
+                local keyDisplay = "None"
+                if key then
+                    local keyStr = tostring(key)
+                    keyStr = keyStr:gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
+                    keyDisplay = Keys[keyStr] or keyStr
+                end
+                table.insert(keybindData, {
+                    name = name,
+                    key = keyDisplay,
+                    mode = value.Mode or "Toggle"
+                })
+            end
+        end
+    end
+    
+    -- Sort alphabetically
+    table.sort(keybindData, function(a, b) return a.name < b.name end)
+end
+
+-- Build the GUI
+local function BuildGUI()
+    -- Clean up old GUI
+    if guiFrame and guiFrame.Parent then
+        guiFrame:Destroy()
+        guiFrame = nil
+    end
+    
+    CollectKeybinds()
+    
+    -- Calculate size based on number of keybinds
+    local itemHeight = 26
+    local headerHeight = 32
+    local padding = 8
+    local totalItems = #keybindData
+    local totalHeight = headerHeight + (totalItems * itemHeight) + (padding * 2)
+    local totalWidth = 260
+    
+    -- Min/Max size
+    totalHeight = math.max(80, math.min(350, totalHeight))
+    if totalItems == 0 then
+        totalHeight = 120 -- Show "No keybinds" message
+    end
+    
+    -- Create ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "KeybindListGUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    
+    -- Main Frame
+    guiFrame = Instance.new("Frame")
+    guiFrame.Size = UDim2.new(0, totalWidth, 0, totalHeight)
+    guiFrame.Position = UDim2.new(0.01, 0, 0.3, 0)
+    guiFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+    guiFrame.BackgroundTransparency = 0.05
+    guiFrame.BorderSizePixel = 0
+    guiFrame.ZIndex = 1000
+    guiFrame.Visible = isVisible
+    guiFrame.Parent = screenGui
+    
+    -- Corner rounding
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = guiFrame
+    
+    -- Border stroke
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(30, 30, 30)
+    stroke.Thickness = 1
+    stroke.Parent = guiFrame
+    
+    -- Shadow
+    local shadow = Instance.new("ImageLabel")
+    shadow.Size = UDim2.new(1, 40, 1, 40)
+    shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+    shadow.Image = "rbxassetid://112971167999062"
+    shadow.ImageTransparency = 0.6
+    shadow.BackgroundTransparency = 1
+    shadow.ZIndex = -1
+    shadow.SliceCenter = Rect.new(Vector2.new(112, 112), Vector2.new(147, 147))
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceScale = 0.6
+    shadow.Parent = guiFrame
+    
+    -- ===== HEADER =====
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, headerHeight)
+    titleBar.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    titleBar.BorderSizePixel = 0
+    titleBar.ZIndex = 1001
+    titleBar.Parent = guiFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.Parent = titleBar
+    
+    -- Title patch (bottom edge)
+    local titlePatch = Instance.new("Frame")
+    titlePatch.Size = UDim2.new(1, 0, 0, 8)
+    titlePatch.Position = UDim2.new(0, 0, 1, -8)
+    titlePatch.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    titlePatch.BorderSizePixel = 0
+    titlePatch.ZIndex = 1001
+    titlePatch.Parent = titleBar
+    
+    -- Title text with icon
+    local titleText = Instance.new("TextLabel")
+    titleText.Size = UDim2.new(1, -50, 1, 0)
+    titleText.Position = UDim2.new(0, 12, 0, 0)
+    titleText.BackgroundTransparency = 1
+    titleText.Text = "⌨️ Keybinds"
+    titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleText.TextSize = 13
+    titleText.FontFace = Enum.Font.GothamBold
+    titleText.TextXAlignment = Enum.TextXAlignment.Left
+    titleText.ZIndex = 1002
+    titleText.Parent = titleBar
+    
+    -- Keybind count badge
+    local countBadge = Instance.new("TextLabel")
+    countBadge.Size = UDim2.new(0, 50, 0, 18)
+    countBadge.Position = UDim2.new(1, -100, 0.5, 0)
+    countBadge.AnchorPoint = Vector2.new(1, 0.5)
+    countBadge.BackgroundColor3 = Color3.fromRGB(217, 70, 239)
+    countBadge.BackgroundTransparency = 0.2
+    countBadge.Text = tostring(totalItems)
+    countBadge.TextColor3 = Color3.fromRGB(217, 70, 239)
+    countBadge.TextSize = 11
+    countBadge.FontFace = Enum.Font.GothamBold
+    countBadge.ZIndex = 1002
+    countBadge.Parent = titleBar
+    
+    local badgeCorner = Instance.new("UICorner")
+    badgeCorner.CornerRadius = UDim.new(1, 0)
+    badgeCorner.Parent = countBadge
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -30, 0, 4)
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    closeBtn.TextSize = 14
+    closeBtn.FontFace = Enum.Font.Gotham
+    closeBtn.ZIndex = 1002
+    closeBtn.Parent = titleBar
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        ToggleKeybindList()
+    end)
+    
+    closeBtn.MouseEnter:Connect(function()
+        closeBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+    end)
+    closeBtn.MouseLeave:Connect(function()
+        closeBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    end)
+    
+    -- Divider line
+    local divider = Instance.new("Frame")
+    divider.Size = UDim2.new(1, 0, 0, 1)
+    divider.Position = UDim2.new(0, 0, 0, headerHeight)
+    divider.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+    divider.BorderSizePixel = 0
+    divider.ZIndex = 1000
+    divider.Parent = guiFrame
+    
+    -- ===== CONTENT =====
+    local contentFrame = Instance.new("ScrollingFrame")
+    contentFrame.Size = UDim2.new(1, 0, 1, -headerHeight - 1)
+    contentFrame.Position = UDim2.new(0, 0, 0, headerHeight + 1)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.BorderSizePixel = 0
+    contentFrame.ZIndex = 1001
+    contentFrame.CanvasSize = UDim2.new(0, 0, 0, totalItems * itemHeight + 10)
+    contentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    contentFrame.ScrollBarThickness = 2
+    contentFrame.ScrollBarImageColor3 = Color3.fromRGB(217, 70, 239)
+    contentFrame.Parent = guiFrame
+    
+    local contentPadding = Instance.new("UIPadding")
+    contentPadding.PaddingTop = UDim.new(0, 4)
+    contentPadding.PaddingBottom = UDim.new(0, 4)
+    contentPadding.PaddingLeft = UDim.new(0, 10)
+    contentPadding.PaddingRight = UDim.new(0, 10)
+    contentPadding.Parent = contentFrame
+    
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 2)
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Parent = contentFrame
+    
+    -- No keybinds message
+    if totalItems == 0 then
+        local emptyLabel = Instance.new("TextLabel")
+        emptyLabel.Size = UDim2.new(1, 0, 0, 40)
+        emptyLabel.BackgroundTransparency = 1
+        emptyLabel.Text = "No keybinds found"
+        emptyLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
+        emptyLabel.TextSize = 13
+        emptyLabel.FontFace = Enum.Font.Gotham
+        emptyLabel.TextXAlignment = Enum.TextXAlignment.Center
+        emptyLabel.ZIndex = 1001
+        emptyLabel.Parent = contentFrame
+    end
+    
+    -- Add keybind items
+    for _, kb in ipairs(keybindData) do
+        local item = Instance.new("Frame")
+        item.Size = UDim2.new(1, 0, 0, itemHeight)
+        item.BackgroundTransparency = 1
+        item.ZIndex = 1001
+        item.Parent = contentFrame
+        
+        -- Keybind Name
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(0.6, -5, 1, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = kb.name
+        nameLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+        nameLabel.TextSize = 12
+        nameLabel.FontFace = Enum.Font.Gotham
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        nameLabel.ZIndex = 1001
+        nameLabel.Parent = item
+        
+        -- Key Display
+        local keyLabel = Instance.new("TextLabel")
+        keyLabel.Size = UDim2.new(0.4, -5, 1, 0)
+        keyLabel.Position = UDim2.new(0.6, 0, 0, 0)
+        keyLabel.BackgroundTransparency = 1
+        keyLabel.Text = kb.key or "None"
+        keyLabel.TextColor3 = Color3.fromRGB(217, 70, 239)
+        keyLabel.TextSize = 12
+        keyLabel.FontFace = Enum.Font.GothamBold
+        keyLabel.TextXAlignment = Enum.TextXAlignment.Right
+        keyLabel.ZIndex = 1001
+        keyLabel.Parent = item
+        
+        -- Mode indicator (small badge for non-toggle modes)
+        if kb.mode and kb.mode ~= "Toggle" then
+            local modeLabel = Instance.new("TextLabel")
+            modeLabel.Size = UDim2.new(0, 35, 0, 14)
+            modeLabel.Position = UDim2.new(0.9, 0, 0.5, 0)
+            modeLabel.AnchorPoint = Vector2.new(0, 0.5)
+            modeLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            modeLabel.BackgroundTransparency = 0.3
+            modeLabel.Text = kb.mode
+            modeLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+            modeLabel.TextSize = 9
+            modeLabel.FontFace = Enum.Font.Gotham
+            modeLabel.TextXAlignment = Enum.TextXAlignment.Center
+            modeLabel.ZIndex = 1001
+            modeLabel.Parent = item
+            
+            local modeCorner = Instance.new("UICorner")
+            modeCorner.CornerRadius = UDim.new(0, 4)
+            modeCorner.Parent = modeLabel
+        end
+    end
+    
+    -- ===== DRAGGABLE =====
+    local dragging = false
+    local dragStart, startPos
+    
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = guiFrame.Position
+        end
+    end)
+    
+    titleBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            guiFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- Toggle function
+local function ToggleKeybindList()
+    isVisible = not isVisible
+    
+    if not guiFrame or not guiFrame.Parent then
+        BuildGUI()
+        if guiFrame then
+            guiFrame.Visible = isVisible
+        end
+        return
+    end
+    
+    guiFrame.Visible = isVisible
+end
+
+-- Show/Hide functions
+local function ShowKeybindList()
+    isVisible = true
+    if not guiFrame or not guiFrame.Parent then
+        BuildGUI()
+    end
+    if guiFrame then
+        guiFrame.Visible = true
+    end
+end
+
+local function HideKeybindList()
+    isVisible = false
+    if guiFrame then
+        guiFrame.Visible = false
+    end
+end
+
+-- Build initial GUI
+BuildGUI()
+
+-- Auto-refresh when keybinds change
+local refreshConn
+refreshConn = RunService.Stepped:Connect(function()
+    if not guiFrame or not guiFrame.Parent then
+        if refreshConn then refreshConn:Disconnect() end
+        return
+    end
+    -- Only rebuild if keybind count changed
+    local oldCount = #keybindData
+    CollectKeybinds()
+    if #keybindData ~= oldCount and isVisible then
+        local wasVisible = isVisible
+        BuildGUI()
+        if guiFrame then
+            guiFrame.Visible = wasVisible
+        end
+    end
+end)
+
+-- ===== KEYBIND TOGGLE (Default: RightControl + K) =====
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.K and UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+        ToggleKeybindList()
+    end
+end)
+
+-- ===== EXPOSE FUNCTIONS GLOBALLY =====
+getgenv().KeybindList = {
+    Toggle = ToggleKeybindList,
+    Show = ShowKeybindList,
+    Hide = HideKeybindList,
+    IsVisible = function() return isVisible end
+}
