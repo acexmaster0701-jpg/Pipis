@@ -2,7 +2,7 @@ if getgenv().Phantom then return end
 getgenv().Phantom = true
 
 -- ========================================
--- V7x FIX: DISABLE HYPHON UI BLOCKER
+-- Fixed by V7x: DISABLE HYPHON UI BLOCKER
 -- ========================================
 
 -- Kill the UI blocker BEFORE anything else
@@ -7652,6 +7652,17 @@ do
                     end
                 end
             })
+            secMod:Toggle({
+                Name = "No Recoil",
+                Flag = "NoRecoil_Enabled",
+                Default = false,
+                Callback = function(State)
+                    S["No Recoil"].Enabled = State
+                    if Player.Character and Player.Character:FindFirstChildOfClass("Tool") and Player.Character:FindFirstChildOfClass("Tool"):FindFirstChild("Setting") then
+                        S.Modify(Player.Character:FindFirstChildOfClass("Tool"))
+                    end
+                end
+            })
 
             -- ammo display label
             secMod:Label("Switch weapons to apply changes")
@@ -7990,7 +8001,7 @@ pcall(function()
     UserInputService.MouseIconEnabled = true
     UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     
-    print("Phantom UI Fix applied - All elements should be visible now!")
+    print("V7x UI Fix applied - All elements should be visible now!")
 end)
 
 
